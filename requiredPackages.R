@@ -19,4 +19,9 @@ packages = c(
   "s2"
 )
 
+# install all packages
 install.packages(packages)
+
+# require all packages
+for (i in 1:length(packages)) { eval(parse(text = paste0("require('",packages[i],"')") )) }
+

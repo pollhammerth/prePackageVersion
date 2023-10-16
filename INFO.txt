@@ -1,0 +1,399 @@
+################################################################################
+#### PMT and P3D R toolset for analysing fluvial terraces ######################
+################################################################################
+
+What is this?:
+
+- PMT (Plot Multiple Terraces) offers functionality to project geodata (rasters, shapefiles) on to profile lines and plot river long profiles. Also models can be fitted to correlated terrace surfaces, allowing to reconstruct paleo river hypsometry.
+
+- P3D (Pseudo 3D) is an extension to PMT, automatically creating radially arranged profiles. Geodata projecting and plotting of a map and profiles is executed according to a standardised fully automated routine. 
+
+
+Recommended system setup (sticking with this setup will most likely result in smooth trouble-free code execution):
+
+OSX 10.15.7
+
+R 4.0.2 using follwing package versions:
+data.table 1.13.0 
+rgdal 1.5-15      
+maptools 1.0-1 
+rgeos 0.5-3    
+raster 3.3-13  
+stringr 1.4.0  
+shape 1.4.4    
+sp 1.4-2       
+dplyr 1.0.1    
+plyr 1.8.6     
+sf 0.9-5       
+readtext 0.76 
+
+
+################################################################################
+#### PMT 2.6 - glossary of functions ###########################################
+################################################################################
+
+depends on following packages:
+data.table 1.13.0 
+rgdal 1.5-15      
+maptools 1.0-1    
+rgeos 0.5-3       
+raster 3.3-13     
+stringr 1.4.0     
+shape 1.4.4       
+sp 1.4-2         
+dplyr 1.0.1       
+plyr 1.8.6        
+sf 0.9-5          
+readtext 0.76    
+
+
+
+part 1 - projecting data:
+
+The first part of the code projects geodata on profile lines. You only need to set some variables (data locations, analysis resolution, stwath width, ...) and execute the code. Detailed descriptions of the user specific variables are found in the sample script. The script output can then be loaded by pt.2 script. The workspace can be deleted completely after running, all necessary data is stored in specified output folder.
+
+How is the data projected?
+All data is projected orthogonally to a profile line, which may be straight, knicked or curved. The ideal profile should be smoothly curved, approximately following the channel centerline. If the channel limits are unknown, p3d can be used firstly, to get an overview of terrace morphologies (profile orientation of best terrace surface correlation). Several raster files can be ingested. For the first raster, a slope raster is calculated, which will later allow filtering pixels (of any raster) by local slope of the first raster. Therefor the first raster should be a surface model. All rasters are down or upsampled to the same resolution and stacked to one file. The pixels are then attributed with information from specific or all fields of one or more polygon shapefiles. This can be used, to classify the pixels according to terrace stratigraphy, or also the modern rivers. The pixels are then projected to the profile and stored in a table, where each raster and attributed fields from shapefiles are stored in a dedicated column. This table is used by pt.2, to filter, plot and evaluate projected data. Additionally one or more point shapefiles can be orthogonally projected. Before projecting, the local value of the first ingested raster (which should always be surface data) is attached to each point of every file. The projected point files are then stored in a list object with all the individual projected shapefiles as tables.
+
+
+
+part 2 - plotting projected data:
+
+This toolset offers functionality to plot projected data and fit models to correlated terrace tops. To learn how to do this, it is recommended to use the sample script as template and adjust it to your data. This version of PMT has been developed alongside a project, dealing with glaciofluvial terraces of Northern Switzerland, focussing on the oldest stratigraphic units. So besides the basic functions, some project specific styles and special functions are included in this compilation, that allow easier handling of the specific data (especially Graf, 2009, 1993, Heuberger & Naef, 2014, Pietsch & Jordan, 2014), but may not be useful for other source data.
+
+What functions are included?
+
+pmt.packages() # loads dependencies. Internal helper. Takes no Arguments.
+
+pmt.extent() # calculates optimal plot axis extents, to fit all projected data in. 
+-Arguments: 
+--data, # projected terrace data, as output by pt1 data.csv
+--x = "x", y = "y", z = "z", # columns with x, y, and z values. for y, several columns can be set as character vector c("colname1","colname2").
+--xfact = NA, yfact = NA # optionally set a factor to extend the axis, to create some blank space e.g. for annotations.
+-Output:
+--list of optimised axis extent
+-Usage:
+--output must be stored as an object named extent. This will be read out by plotting function. Editing the extent object allows for creating zoomed views.
+
+pmt.zoom() # edits the extent object, by clicking new extents in existing plot. Newly calling the plot will create a zoomed view.
+-No Arguments.
+-Output:
+--list of plot axis extent, to be stored as an object named extent.
+--expression to be copy pasted in your script, to recall the zoom extent, if needed
+
+pmt.zoomPaster() # outputs an expression, that can be copy pasted to your script, recalling the current plot extent. Do this before setting a zoom with pmt.zoom() to be able to recall the corrent extent.
+-No Arguments.
+-Output:
+--expression to recall the current plot extent.
+
+pmt.empty() # creates an empty plot, to be filled with projected data. This is the first thing to do, when starting a new plot.
+-Arguments:
+--ext = extent # list object containing the axis extents, as created by pmt.extent() or pmt.zoom()
+--main="Plot Multiple Terraces (pmt)" # plot title
+--textcex = 1 # factor to adjust the text size of title, subtitle and labels
+--zoom = F # if a plot has already been called, this can be set T, which will ask you to click two points in the existing plot, defining the new plot extent, and confirming with esc. Then a zoomed plot is created, without editing the extent object.
+--ylab="elevation [m]" # y axis label
+--xlab="distance along profile [m]" # x axis label
+--sub=NULL # subtitle
+--grid=F # T will activate a grid, F will create a plot without grid
+--bg.col=NA # change the backround color, to achieve good contrast with your set data colors. e.g. "black"
+--grid.col="grey80" # set the color of the grid lines
+--grid.wd = 1 # set the width of the grid lines
+--... # arguments forwarded to plot()
+
+pmt.select() # Provides an assistant for creating filter expressions for your projected raster data. The assistant will ask you for specific information in the console.
+-Arguments:
+--data.name # name of the projected raster data object (as character string: "data")
+--Further arguments identical to those in pmt.filter() can be set optionally, if you already know some of the desired filter parameters.
+-Output:
+--a pmt.filter() expression, that will on demand filter the desired data. (e.g. store the expression in an object named for example hds and execute filtering by eval(hds). Preconfigured project specific filter expressions for Northern Switzerland are also available. See below.)
+
+pmt.filter() # function that filters raster pixels by attributes in the projected data table.
+-Attributes:
+--data # original projected data table, as output by pt.1 (data or data.csv)
+--regard.column = NA, regard.elements = NA # name of the column and element, that the data should be filtered for. more than one element can be provided as a character vector.
+--disregard.column = NA, disregard.elements = NA # name of a column and entries within that column, that should be disregarded for the function output. more than one element can be provided by entering a character vector.
+--thresh.column = NA, threshold = NA # column containing numerical values and threshold up to which data should be regarded in the function output. Can be used e.g. to filter pixels to a maximum local slope.
+--x = NA, y = NA, z = NA # names of the columns containing x, y and z values respectively.
+--drop.unused = FALSE # define whether all columns, not mentioned in this filter expression should be dropped. FALSE = keep all columns, TRUE = drop everything but the mentioned ones in the function call.
+-Output:
+--projected raster data, filtered by e.g. stratigraphic unit and/or local slope and/or orthogonal distance
+
+pmt.plot() # plots projected raster data.
+-Arguments:
+--data # the projected raster data. filtered data can be provided by evaluating a previously stored filter expression (e.g. eval(hds)).
+--y="y" # name of the column with y values
+--col="black" # pixel color
+--type="p" # "p" creates points. In some cases "l" may be useful, which will connect the points to a line, in the order stored in the data table.
+--cex=1 # pixel size
+--pch=16 # pixel type (16 is a full circle)
+--lwd=1 # width of the line, if type = "l"
+--lty=1 # type of the line, if type = "l". 3 would be dashed
+--x="x" # name of the column containing x values
+--range=NULL # specify if only a limited z axis range should be plotted. In other words, this will reduce the calculated search radius
+--single = NULL # allows to subset the input data. takes a character vector with two elements c("column name","value").
+--add = T # set F, if a new plot should be created, of T if the data should be added to an existing plot.
+--... # optional additioinal arguments, forwarded to plot()
+
+pmt.plotGreyscale() # plots raster data greyscaled with orthogonal distance to the profile line. the closer, the darker.
+-Arguments:
+--data # the projected raster data. filtered data can be provided by evaluating a previously stored filter expression (e.g. eval(hds)).
+--y="y" # name of the column with y values
+--cex=1 # pixel size
+--pch=16 # pixel type (16 is a full circle)
+--lwd=1 # can be skipped. this is for plotting lines, which is not intended with this function.
+--x="x" # type of the line, if type = "l". 3 would be dashed
+--range=NULL # specify if only a limited z axis range should be plotted. In other words, this will reduce the calculated search radius
+--single = NULL # allows to subset the input data. takes a character vector with two elements c("column name","value").
+--add = T # set F, if a new plot should be created, of T if the data should be added to an existing plot.
+--z = "z" # column name with the orthogonal distance values.
+--... # optional additioinal arguments, forwarded to plot()
+
+pmt.bin() # creates a binned x axis (y values are put together within x axis intervals) and calculates mean, median, min or max y values for each bin. Also calculates standard deviation and counts number of pixels for each bin. Instead of binning the x axis, also mapped polygons can be used as bin, meaning that mean, median, min or max values will be calculated for individual mapped terraces. A threshold of min pixel count per bin or standard deviation can be set, under which values will not be stored in function output. This removes small terraces, or terrace fringes.
+-Arguments:
+--data # projected data of one stratigraphic unit (may be provided, using stored pmt.filter() call e.g. eval(hds))
+--interval = 500 # size of the x axis bins
+--value = "median" # value to be calculated for each bins y values. Available is "median", "mean", "min", "max"
+--mode = "bin" # specify if x axis should be binned "bin", or if values should be calculated for individual mapped polygons "id". If "id" is set, the unique terrace ids will be stored in the function output dataframe.
+--idfield = "map.terrace" # if mode = "id", idfield will specify which column in the input data table contains polygon ids. Simply provide the column name.
+--cth = NA # threshold of a minimum pixel count to remove terrace fringes or small terraces
+--sth = NA # threshold of a max. standard deviation. Well preserved terrace morphologies should result in a small sd, so if the sd is locally larger, this may be an expression of unadequate profile orientation or more than one terrace within one bin. Needs to be evaluated visually. Note that for older terraces, the sd is generally higher.
+-Output:
+--a dataframe with binned values, representative of terrace surfaces, if parameters are set suiteably. This data can be used as input for pmt.plotBin() and pmt.model()
+
+pmt.plotBin() # plots output of pmt.bin() with standard symbology. May be useful for other point data as well.
+-Arguments:
+--data = b # the pmt.bin() output.
+--points = T # specify whether points should be plottet. T means yes, F means no.
+--ppch = 16 # Symbol used for points (16 = full circle, 95 = horizontal bar)
+--border = "black" # outline of the plotted circle
+--fill = "white" # filling of the plotted circle
+--anno = F # specify whether annotaions should be plotted for each point. T means please annotate, F means do nothing
+--column = "id" # name of the column where the values for annotations are read out. If pmt.bin(mode = "id") this can be used to plot the unique ids of terrace polygons.
+--add = T # T will add the points to an existing plot, F will create a new plot
+--pcex = 1 # adjust the point size
+--tsrt = 66 # rotation value for annotations
+--tcex = 1 # size of the annotation text
+--x = "x", y = "y" # name of the columns containing the x and y values respectively
+--anno.spacer = c("---- ","--------------- ") # annotations are placed within a distance to the point, specified by a text, that is inserted before the annotated value taken from the specified column. You can specify one character string, or a vector of character strings.
+--... # additional arguments, forwarded to pmt.empty(), if add = F
+
+pmt.rmBbox() # remove values from pmt.bin() output (e.g. eroneous values at terrace fringes), or whole terraces from projected raster data. 
+-Usage:
+--call without arguments lx or ly set, to interactively click two points, defining a bounding box of the area, that should be removed and confirm with esc. Copy and paste the expression prompted in the console to recall the function, if needed.
+-Arguments:
+--data = b # either the output of pmt.bin() or any dataframe with x and y coordinates stored in columns named "x" and "y" respectively
+--lx = NA, ly = NA # coordinates defining the bounding box (are set interactively within existing plot, if not provided)
+-Output:
+--like input, but with points removed, that were inside the specified bounding box
+--expression prompted in the console, to copy paste in your script, for recalling the function
+
+pmt.selectBbox() # opposite of pmt.rmBbox(). In this case, all points within the bounding box are kept, while all outside are deleted.
+-Arguments:
+--data = b # either the output of pmt.bin() or any dataframe with x and y coordinates stored in columns named "x" and "y" respectively
+--lx = NA, ly = NA # coordinates defining the bounding box (are set interactively within existing plot, if not provided)
+-Output:
+--like input, but with points removed, that were outside the specified bounding box
+--expression prompted in the console, to copy paste in your script, for recalling the function
+
+pmt.rmExtreme() # remove the value next to a given x coordinate. Useful if eroneous values occur in the output of pmt.bin().
+-Arguments:
+--data = b # either the output of pmt.bin() or any dataframe with x and y coordinates stored in columns named "x" and "y" respectively
+--l = NA # x coordinate or numerical vector of x coordinates of the (or close to the) point to be removed. If not provided, you will be asked to click on one or more points in an existing plot.
+-Output:
+--same as input, but with the point closest to the x coordinate specified in argument l removed.
+--also an expression will be prompted, to copy paste in your script, to recall the interactively set function
+
+pmt.createPoints() # creates a dataframe with point coordinates, that can be used like pmt.bin() output. This allows manual interpretation, if pmt.bin() is not suitable.
+-Arguments:
+--x = NA, y = NA # coordinates of points to be created. If NA is set, you will be asked to click point positions in an existing plot and confirm with esc.
+-Output:
+--a dataframe with point coordinates, similar to the function output of pmt.bin()
+--an expression will be prompted in the console to be copy pasted in your script, to recall the function, if needed.
+
+pmt.addPoint() # this will add points to an existing point dataframe, as outputted by pmt.bin() or pmt.createPoints().
+-Arguments:
+--data = b # the output of pmt.bin() or pmt.createPoints()
+--x = NA, y = NA # coordinates of points to be added. If set NA, you will be asked to click point locations in an existing plot and confirm with esc.
+-Output:
+--a dataframe with point coordinates, similar to the function output of pmt.bin()
+--an expression will be prompted in the console to be copy pasted in your script, to recall the function, if needed.
+
+pmt.model() # executes linear or polynomial regression with data created by pmt.bin() or pmt.createPoints() or any other dataframe with coordinates stored in columns named "x" and "y".
+-Arguments:
+--data # dataframe with x and y coordinates, stored in columns named "x" and "y" respectively
+--deg = 1 # 1 executes linear regression, 2 or higher will fit a polynomial function
+-Output:
+--model, that can be used as input for pmt.plotModel()
+
+pmt.plotModel() # plots the function output of pmt.model()
+-Arguments:
+--model = m # function output of pmt.model()
+--col = "black" # color for plotting of the function
+--conf = T
+--lev = 0.95
+--lwd = 2 # width of the line to be plotted
+--lty = 1 # type of the line to be plotted (3 would be dashed)
+--add = T # T will add the model to an existing plot, F will create a new plot
+--elev = 0 # the model can be shifted in elevation. This has been done for the "Donau plot" in the report, to create a bended grid, parallel to the modern danube, with 20 m vertical distance
+--extrapol = T # should the model be extrapolated? T means yeas, F means no.
+--dashed = T # F will create a solid coloured line. T will add a black dashed line on top, to increase the contrast in dense plots, with a lot of data.
+--highlight = F # similar to "dashed" this tries to make the model stand out in the plot, but with creating a mask around the function line.
+--colhl = "#ffffff99" # color of the mask, if highlight is set T.
+-Output:
+--adds an existing model to a plot
+
+pmt.drawSlope() # reads the local slope from a model (created with pmt.model()) at a specified x axis location and annotates the model with the local slope and an arrow to the measurement location in an existing plot.
+-Arguments:
+--mod = m # model, created with pmt.model()
+--locate=TRUE # TRUE means that the location of the slope measurement and the annotation should be set manually, by clicking in an existing plot. (1. click on the model location, where the slope should be read out, 2. and 3 click arrow segments. esc to confirm)
+--x1=NA,y1=NA,x2=NA,y2=NA,x3=NA,y3=NA # coordinates of the arrow for annotating. Only for recalling the function. Leave NA.
+--lwd=1 # width of the arrow line
+--ann=TRUE # if FALSE, the plot will not be annotated, but the slope prompted in the console only.
+--tcex=1 # size of the annotation text
+-Output:
+--adds local slope annotation to a model
+--an expression will be prompted in the console to be copy pasted in your script, to recall the function, if needed.
+
+pmt.measureSlope() # quickly measure a slope between two points, clicked in an existing plot. (click two times and confirm with esc)
+-Arguments:
+--x = NA, y = NA # coordinates of two points, defining a line
+--extrapol = F # T will create an infinite line, F will limit the line to the given points
+--addText = NA # optionally add text, that will be appended to the annotation
+-Output:
+--adds a line and optionally the slope value of that line to an existing plot.
+--an expression will be prompted in the console to be copy pasted in your script, to recall the function, if needed.
+
+pmt.drawAnnotation() # creates an annotation, optionally with an arrow in an existing plot, by clicking 1 or 3 points in an existing plot, confirming with esc and entering the desired text in the console, confirming with enter. (1 click -> position of the text; 3 clicks -> arrow segments from 1 = tip, 3 = tail)
+-Arguments:
+--x1=NA,y1=NA,x2=NA,y2=NA,x3=NA,y3=NA # arrow coordinates. Leave NA, to set interactively
+--lwd=1 # width of the arrow line
+--string = NA # text to be written at the end of the arrow
+--tcex=1 # size of the text
+-Output:
+--will add an annotation with an arrow inside the plot
+--an expression will be prompted in the console to be copy pasted in your script, to recall the function, if needed.
+
+pmt.measureHorizontal() # will create horizontal measurebar, that can be annotated with text. Useful to mark e.g. the width of a orthogonally crossed valley in the profile.
+-Arguments:
+--x1=NA,y1=NA,x2=NA,y2=NA # coordinates of the measurement bar (e.g. upper left and lower right corner). Leave NA, to set two points by clicking in an existing plot.
+--lwd=1 # width of the measure bar
+--tcex=1 # size of the text
+--string = NA # text to be written below/above the bar (you will be asked to enter the text in the console)
+-Output:
+--creates a annotated measure bar inside an existing plot.
+--an expression will be prompted in the console to be copy pasted in your script, to recall the function, if needed.
+
+pmt.drawPoly() # simply draw a polygon, by clicking its corners in an existing plot and confrim with esc.
+-Arguments:
+--plot = T # if T, the clicked polygon will be plotted directly in an existing plot. F will not plot the polygon
+-Output:
+--dataframe containing the coordinates of the polygon edges, that can be used as input for polygon().
+--an expression will be prompted in the console to be copy pasted in your script, to recall the function, if needed.
+
+pmt.profiler() # creates a topographic profile along the profile line.
+-Arguments:
+--data # projected raster data, created by PMT pt.1
+--column = "z" # name of the column containing the orthogonal distance values of individual pixels
+--radius = analysis.resolution/2 # radius around the profile line within which pixels should be used for plotting the topographic profile. recommended: use half of the raster resolution, to only regard the closest pixels
+--color = "black" # color of the topographic profile line
+--... # further arguments passed on to pmt.plot()
+-Output:
+--adds a topographic profile to an existing plot.
+
+pmt.measureSpacing() # measure and annotate the vertical distance of two points in an existing plot by clicking 3 points and confirming with esc. (1 and 2: lower and upper end of the measure bar, 3: horizontal position of the arrow and annotation)
+-Arguments:
+--x1=NA,y1=NA,x2=NA,y2=NA,x3=NA,y3=NA # leave NA, to click 3 points in an existing plot.
+--lwd=1 # width of the measure bar lines
+--tcex=1 # size of the annotation text
+-Output:
+--adds an annotated vertical measure bar showing the y axis distance to an existing plot
+--an expression will be prompted in the console to be copy pasted in your script, to recall the function, if needed.
+
+pmt.plotId() # derivation of pmt.bin(). adds unique polygon ids, as read out from a specified column in the source data to an existing plot, to easily identify specific terraces.
+-Arguments:
+--filter.expression # filter expression, as created by pmt.select(). ATTENTION!: enter the name of an object, containing the filter expression (hds <- pmt.select()), not the filtered data!.
+--col = "white"
+--field = "id"
+-Output:
+--annotates terraces with their unique polygon ids in an existing plot
+
+
+
+Additional project specific functions and styles (useful together with geodata from nagra project Pollhammer et al. 2021):
+
+functions:
+
+plotBaseHDS()* # plots base outcrops of Higher Deckenschotter
+
+plotBaseTDS()* # plots base outcrops of Lower Deckenschotter
+
+plotGraf93()* # plots heavy mineral analyses of Graf (1993) with the identical symbology as used in the literature
+
+plotGraf09Pepples()* # plots pepple counts of Graf (2009a) with identical symbology as used in the literature
+
+plotGraf09HeavyMinerals()* # plots heavy mineral analyses of Graf (2009a), using the identical symbology as in the literature
+
+plotKnudsen()* # plots dated outcrops and annotates them with age value
+
+plotLocalities()* # adds local names to an existing plot
+
+* Arguments of the project specific functions above are analogous to pmt.filter(), pmt.plot() and/or pmt.plotBin(). It is recommended to check the example script for usage. The Values can be filtered by stratigraphic unit, however, the associated unit has been extracted via spatial join from the terrace map and is therefor not necessarily identical to the literature.
+
+
+filterNAB1402Bohrungen() # filters base outcrops of Nieder- or Hochterrasse from projected data, containing values from both stratigraphic units. The output can be plotted e.g. with pmt.plot()
+
+binBase() # a helper, that will modify the structure of the dataframe, created by filterNAB1402Bohrungen(), to look like the output of pmt.bin(), so it can easily be used for pmt.model(), pmt.rmBbox() and other functions.
+
+
+styles and other helpful data:
+
+dsNames # a list of named vectors, containing unique terrace ids, associated with local names. e.g. Schienerberg hosts more than one occurrence of Tiefere Deckenschotter, so it is stored as a list of several polygons. This is helful for filtering projected data for specific regions. e.g. lib.add <- c(tdsNames$Schienerberg, tdsNames$Rauhenberg); eval(ds$lib)
+
+ds # contains a list of pmt.filter() expressions. These expressions will filter all Höhere Deckenschotter eval(ds$hds), Tiefere Deckenschotter eval(ds$tds), Hochterrasse eval(ds$ht), Niederterrasse eval(ds$nt), or freely selectable terraces with eval(ds$lib). The expressions will look for following objects in the global variable space: hds.add, hds.remove, tds.add, tds.remove, ... , lib.add, lib.remove. These objects are per standard set NA, which means, nothing will be changed. If they contain a vector of terrace ids, these terraces will be added or removed to/from the filtered output. Simply set e.g. hds.remove <- hdsNames$Schienerberg, or lib.add <- hdsNames$Salen_Reutenen, or simply enter one or more polygon ids directly with lib.add <- c(23,56,12)
+
+rivNames # identical content and usage as dsNames, but containing ids of modern rivers
+
+riv # identical to ds, but containing filter expressions, that return pixels of a desired modern river. Use eval(riv$Aare) to get only Aare pixels. Also you may use riv.add, to add another river to a single dataframe.
+
+styles # contains standard color code, used for Northern Switzerland and more. Just call by typing e.g.: styles$hds$col, or styles$hds$col2 for a lighter color.
+
+
+
+
+
+
+################################################################################
+#### P3D 1.0 - glossary of functions ###########################################
+################################################################################
+
+depends on following packages:
+PMT 2.6
+maptools 1.0-1 
+rgeos 0.5-3    
+raster 3.3-13  
+stringr 1.4.0  
+shape 1.4.4    
+sp 1.4-2       
+dplyr 1.0.1    
+plyr 1.8.6     
+sf 0.9-5       
+readtext 0.76 
+
+
+Handling:
+
+1. Make a copy of the sample p3d code in the same folder and name it uniquely.
+
+2. Open the file and set/check the user specifyable variables at the beginning of the file.
+
+3. Run the script. (Try with low analysis resolution first (eg. 50 - 100), and check the time needed for calculation. If that works fast (e.g. few minutes), lower the resolution to 30 or 20 (may take hours), or even 10 (can take a day))
+
+Descripions of variables to be set are found within the p3d script.
+
+When all data paths for a specific project are set, new profile series can be created simply by providing new coordinates and radius.
+
+Once the script has run through, plots can be adjusted (e.g. larger pixel size, lower slope filter, ...) without doing the time consuming projecting step again.
+
+Important! : The fitted models only are reasonable with maps of adequate detail, since fully automated modelling will not work well with e.g. several recessional terraces within one mapped unit at a small scale. However, if the scale is set large enough (e.g. Deckenschotter between Klettgau and Lake Constance) it may work well, but the models must be evaluated visually and ideally maps should be edited, to improve results (e.g. disregard badly fitting terraces)!
+

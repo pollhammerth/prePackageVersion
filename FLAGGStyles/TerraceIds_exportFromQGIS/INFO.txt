@@ -1,0 +1,18 @@
+ntIds und htIds wurden in R aus projizierten Daten für SyntheseEW_01 (sr50km;ar100m) gezogen. Ids ausserhalb dieses Bereiches fehlen! Ggf. für andere Profile anzupassen.
+
+  ht <- expression(pmt.filter(data, "mapped.NAME_KURZ", c("02_HT"), disregard.column = NA, 
+                        disregard.elements = NA, thresh.column = NA, threshold = NA, 
+                        x = "location", y = "flaggDEM10", z = "flaggDEM10", drop.unused = FALSE))  
+  ht <- eval(ht)
+  htIds <- unique(ht$mapped.terrace)
+  save(htIds, file = "htIds.Rdata")
+  nt <- expression(pmt.filter(data, "mapped.NAME_KURZ", c("01_NT"), disregard.column = NA, 
+                              disregard.elements = NA, thresh.column = NA, threshold = NA, 
+                              x = "location", y = "flaggDEM10", z = "flaggDEM10", drop.unused = FALSE))  
+  nt <- eval(nt)
+  ntIds <- unique(nt$mapped.terrace)
+  save(ntIds, file = "ntIds.Rdata")
+
+
+
+(Gilt nicht für dsIds -> gewonnen aus original FLAGG map in QGIS.) 
